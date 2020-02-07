@@ -1,0 +1,28 @@
+<package format="2">
+	<name>ground_finder</name>
+	<version>0.1.0</version>version
+	<description>
+		This package subscribes to an Octomap binary message and estimates what free space is adjacent to the ground.
+	</description>
+	<maintainer email="andmills17@gmail.com">Andrew B Mills</maintainer>
+
+	<url>https://github.com/andrewbmills/marble-frontier</url>
+	<author>Andrew B Mills</author>
+	  <license>TODO</license>
+
+	<buildtool_depend>catkin</buildtool_depend>
+	<depend>roscpp</depend>
+	<depend>rospy</depend>
+	<depend>rosconsole</depend>
+	<depend>rostime</depend>
+	<depend>roscpp_serialization</depend>
+	<depend>octomap_ros</depend>
+	<depend>boost_system</depend>
+	<depend>pcl</depend>
+	<depend>pcl_conversions</depend>
+	<depend>pcl_ros</depend>
+	<depend>sensor_msgs</depend>
+	<depend>std_msgs</depend>
+	<depend>octomap_msgs</depend>
+	<depend>octomap</depend>
+</package>

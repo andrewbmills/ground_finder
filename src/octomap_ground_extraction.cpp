@@ -96,7 +96,7 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
     // Skip Occupied nodes
     // ROS_INFO("Checking occupancy @ (%0.1f, %0.1f, %0.1f)", it.getX(), it.getY(), it.getZ());
     if (it->getOccupancy() >= 0.3) {
-      if (it->getOccupancy() >= 0.6) {
+      if (it->getOccupancy() >= 0.7) {
         occupied_point.x = it.getX();
         occupied_point.y = it.getY();
         occupied_point.z = it.getZ();
@@ -193,6 +193,7 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
 
   // Convert from pcl::PointCloud to sensor_msgs::PointCloud2
   pcl::toROSMsg(*cloud_clustered, new_PC2_msg);
+  // pcl::toROSMsg(*cloud_occupied, new_PC2_msg);
   new_PC2_msg.header.seq = 1;
   new_PC2_msg.header.stamp = ros::Time();
   new_PC2_msg.header.frame_id = msg->header.frame_id;

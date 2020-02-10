@@ -1,5 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <launch>
-  <node pkg="ground_finder" type="ground_finder" name="ground_finder" output="screen">
+  <node pkg="ground_finder" type="ground_finder" name="ground_finder">
   	<!-- <remap from="octomap_binary" to="map_fused"/> -->
 
   	<!-- Params -->

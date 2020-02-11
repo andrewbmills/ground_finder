@@ -104,18 +104,34 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
       }
       continue;
     }
-    // Check if bottom neighbor is an occupied voxel
+    // Check if bottom neighbor or its neighbors are an occupied voxel
     // ROS_INFO("Node is free, checking bottom neighbor.");
-    octomap::OcTreeNode* node = tree->search(it.getX(), it.getY(), it.getZ() - tree->getResolution());
+    std::vector<octomap::OcTreeNode*> bottom_neighbors;
+    octomap::OcTreeNode* node0 = tree->search(it.getX(), it.getY(), it.getZ() - tree->getResolution());
+    octomap::OcTreeNode* node1 = tree->search(it.getX() - tree->getResolution(), it.getY(), it.getZ() - tree->getResolution());
+    octomap::OcTreeNode* node2 = tree->search(it.getX() + tree->getResolution(), it.getY(), it.getZ() - tree->getResolution());
+    octomap::OcTreeNode* node3 = tree->search(it.getX(), it.getY() - tree->getResolution(), it.getZ() - tree->getResolution());
+    octomap::OcTreeNode* node4 = tree->search(it.getX(), it.getY() + tree->getResolution(), it.getZ() - tree->getResolution());
+    bottom_neighbors.push_back(node0);
+    bottom_neighbors.push_back(node1);
+    bottom_neighbors.push_back(node2);
+    bottom_neighbors.push_back(node3);
+    bottom_neighbors.push_back(node4);
 
-    if (node != NULL) { // Might want to count nodes adjacent to nothing as ground as well.
-      if (node->getOccupancy() >= 0.5) {
-        // ROS_INFO("Bottom neighbor is occupied.  Add to cloud.");
-        // Add to PCL
-        ground_point.x = it.getX();
-        ground_point.y = it.getY();
-        ground_point.z = it.getZ();
-        cloud->points.push_back(ground_point);
+    int ground_neighbor_count = 0;
+    for (int i=0; i<5; i++) {
+      if (bottom_neighbors[i] != NULL) { // Might want to count nodes adjacent to nothing as ground as well.
+        if (bottom_neighbors[i]->getOccupancy() >= 0.5) {
+          ground_neighbor_count++;
+          // Add to PCL
+          if ((i == 0) || (ground_neighbor_count == 2)) {
+            ground_point.x = it.getX();
+            ground_point.y = it.getY();
+            ground_point.z = it.getZ();
+            cloud->points.push_back(ground_point);
+            break;
+          }
+        }
       }
     }
   }

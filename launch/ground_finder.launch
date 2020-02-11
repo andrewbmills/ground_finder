@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>
-  <node pkg="ground_finder" type="ground_finder" name="ground_finder">
+  <node pkg="ground_finder" type="ground_finder" name="ground_finder" ns="H03">
   	<remap from="octomap_binary" to="merged_map"/>
 
   	<!-- Params -->
   	<param name="update_rate" value="1.0"/>
   	<param name="min_cluster_size" value="50"/>
-  	<param name="vertical_padding" value="4"/>
+  	<param name="vertical_padding" value="2"/>
     <!-- 0.95 filters out stairs in the EC Basement -->
   	<param name="normal_z_threshold" value="0.95"/>
 

@@ -68,6 +68,7 @@ class GroundFinder
     int min_cluster_size = 200;
     float normal_z_threshold;
     int vertical_padding;
+    std::string mode = "flat"
     sensor_msgs::PointCloud2 ground_msg;
     sensor_msgs::PointCloud2 edt_msg;
     void callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg);
@@ -117,6 +118,14 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
     bottom_neighbors.push_back(node2);
     bottom_neighbors.push_back(node3);
     bottom_neighbors.push_back(node4);
+
+    if (bottom_neighbors[0] == NULL) { // include points that have bottom neighbors that are unseen
+      ground_point.x = it.getX();
+      ground_point.y = it.getY();
+      ground_point.z = it.getZ();
+      cloud->points.push_back(ground_point);
+      continue;
+    }
 
     int ground_neighbor_count = 0;
     for (int i=0; i<5; i++) {
@@ -219,7 +228,12 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
 
   // Call EDT and write to msg
   int size[3];
-  for (int i=0; i<3; i++) size[i] = round((max[i]-min[i])/tree->getResolution()) + 1;
+  for (int i=0; i<3; i++) {
+    // Pad the 3d matrix size with empty cells to get rid of EDT edge calculations
+    min[i] = min[i] - 3.0*tree->getResolution();
+    max[i] = max[i] + 3.0*tree->getResolution();
+    size[i] = round((max[i]-min[i])/tree->getResolution()) + 1;
+  }
   pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_edt (new pcl::PointCloud<pcl::PointXYZI>);
   PointCloudEDT(cloud_clustered, cloud_occupied, cloud_edt, min, size, tree->getResolution());
 

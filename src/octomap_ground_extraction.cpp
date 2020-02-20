@@ -68,7 +68,6 @@ class GroundFinder
     int min_cluster_size = 200;
     float normal_z_threshold;
     int vertical_padding;
-    std::string mode = "flat"
     sensor_msgs::PointCloud2 ground_msg;
     sensor_msgs::PointCloud2 edt_msg;
     void callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg);

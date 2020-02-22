@@ -153,6 +153,7 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
   ne.setSearchMethod(kdtree_normal);
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
   ne.setRadiusSearch(3.0*tree->getResolution());
+  ne.setViewPoint(0.0, 0.0, 2.0);
   ne.compute(*cloud_normals);
 
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);

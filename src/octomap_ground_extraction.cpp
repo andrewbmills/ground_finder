@@ -173,8 +173,8 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
   std::vector<pcl::PointIndices> cluster_indices;
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_clustered(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-  // ec.setClusterTolerance(1.5*tree->getResolution()); // Clusters must be made of contiguous sections of ground (within sqrt(2)*voxel_size of each other)
-  ec.setClusterTolerance(1.1*tree->getResolution()); // Clusters must be made of contiguous adjacent sections of ground (1.1 voxel_size of each other)
+  ec.setClusterTolerance(1.5*tree->getResolution()); // Clusters must be made of contiguous sections of ground (within sqrt(2)*voxel_size of each other)
+  // ec.setClusterTolerance(1.1*tree->getResolution()); // Clusters must be made of contiguous adjacent sections of ground (1.1 voxel_size of each other)
   ec.setMinClusterSize(min_cluster_size); // Cluster must be at least 15 voxels in size
   // ec.setMaxClusterSize (30);
   ec.setSearchMethod(kdtree);

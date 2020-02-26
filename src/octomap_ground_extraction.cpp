@@ -173,7 +173,8 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
   std::vector<pcl::PointIndices> cluster_indices;
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_clustered(new pcl::PointCloud<pcl::PointXYZ>);
   pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-  ec.setClusterTolerance(1.5*tree->getResolution()); // Clusters must be made of contiguous sections of ground (within sqrt(2)*voxel_size of each other)
+  // ec.setClusterTolerance(1.5*tree->getResolution()); // Clusters must be made of contiguous sections of ground (within sqrt(2)*voxel_size of each other)
+  ec.setClusterTolerance(1.1*tree->getResolution()); // Clusters must be made of contiguous adjacent sections of ground (1.1 voxel_size of each other)
   ec.setMinClusterSize(min_cluster_size); // Cluster must be at least 15 voxels in size
   // ec.setMaxClusterSize (30);
   ec.setSearchMethod(kdtree);
@@ -194,14 +195,33 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
   ROS_INFO("Filtering out largest cluster");
   for (int i=0; i<cluster_indices[0].indices.size(); i++) {
     int idx = cluster_indices[0].indices[i];
-    cloud_clustered->points.push_back(cloud_filtered->points[idx]);
+    // cloud_clustered->points.push_back(cloud_filtered->points[idx]);
     pcl::PointXYZ padded_point;
     padded_point.x = cloud_filtered->points[idx].x;
     padded_point.y = cloud_filtered->points[idx].y;
     padded_point.z = cloud_filtered->points[idx].z;
+    std::vector<pcl::PointXYZ> padded_points;
+    bool add_point = true;
     for (int j=0; j<vertical_padding; j++) {
       padded_point.z = padded_point.z + tree->getResolution();
-      cloud_clustered->points.push_back(padded_point);
+      // Check if padded point is occupied
+      octomap::OcTreeNode* node = tree->search(padded_point.x, padded_point.y, padded_point.z);
+      if (!(node == NULL)) {
+        if (node->getOccupancy() >= 0.5) {
+          add_point = false;
+          continue;
+        }
+      }
+      padded_points.push_back(padded_point);
+    }
+    // Add points and the padded points if none of them were occupied.
+    if (add_point) {
+      cloud_clustered->points.push_back(cloud_filtered->points[idx]);
+      for (int j=0; j<padded_points.size(); j++) {
+        cloud_clustered->points.push_back(padded_points[j]);
+      }
+    } else {
+      continue;
     }
     if (padded_point.x < min[0]) min[0] = padded_point.x;
     if (padded_point.y < min[1]) min[1] = padded_point.y;

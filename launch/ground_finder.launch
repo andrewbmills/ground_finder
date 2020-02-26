@@ -8,7 +8,7 @@
   	<param name="min_cluster_size" value="50"/>
   	<param name="vertical_padding" value="4"/>
     <!-- 0.95 filters out stairs in the EC Basement -->
-  	<param name="normal_z_threshold" value="0.90"/>
+  	<param name="normal_z_threshold" value="0.93"/>
 
   </node>
 </launch>

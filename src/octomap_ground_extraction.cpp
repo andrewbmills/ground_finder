@@ -45,9 +45,20 @@ void PointCloudEDT(pcl::PointCloud<pcl::PointXYZ>::Ptr input, pcl::PointCloud<pc
     }
   }
 
+  // If a cell is below an input point, it is ground and shouldn' be occupied.
+  for (int i=0; i<input->points.size(); i++) {
+    for (int j=1; j<3; j++) {
+      double query[3] = {(double)input->points[i].x, (double)input->points[i].y, (double)input->points[i].z - j*voxel_size};
+      int idx = xyz_index3(query, min, size, voxel_size);
+      if ((idx >= 0) && (idx < size[0]*size[1]*size[2])) {
+        mat[idx] = true;
+      }
+    }
+  }
+
   // Call EDT function
   float* dt = edt::edt<bool>(mat, /*sx=*/size[0], /*sy=*/size[1], /*sz=*/size[2],
-  /*wx=*/1.0, /*wy=*/1.0, /*wz=*/100.0, /*black_border=*/false);
+  /*wx=*/1.0, /*wy=*/1.0, /*wz=*/1.0, /*black_border=*/false);
 
   // Parse EDT result into output PointCloud
   for (int i=0; i<input->points.size(); i++) {
@@ -58,6 +69,8 @@ void PointCloudEDT(pcl::PointCloud<pcl::PointXYZ>::Ptr input, pcl::PointCloud<pc
     edt_point.intensity = (float)dt[idx]*voxel_size;
     output->points.push_back(edt_point);
   }
+
+  delete[] dt;
   return;
 }
 
@@ -266,13 +279,16 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
   edt_msg = new_PC2_msg;
   ROS_INFO("Callback end.");
 
+  // Delete new pointers
+  delete tree;
+
   return;
 }
 
 int main(int argc, char **argv)
 {
   // Node declaration
-  ros::init(argc, argv, "ground_finderr");
+  ros::init(argc, argv, "ground_finder");
   ros::NodeHandle n;
 
   GroundFinder finder;

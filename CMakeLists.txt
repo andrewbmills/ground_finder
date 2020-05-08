@@ -36,3 +36,8 @@ add_executable(ground_finder src/octomap_ground_extraction.cpp)
 target_link_libraries(ground_finder
   ${catkin_LIBRARIES}
 )
+
+add_executable(traversability_mapping src/traversability_map_node.cpp)
+target_link_libraries(traversability_mapping
+  ${catkin_LIBRARIES}
+)

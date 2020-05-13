@@ -76,6 +76,7 @@ class NodeManager
     void FindGroundVoxels();
     void UpdateRobotState();
     sensor_msgs::PointCloud2 GetGroundMsg();
+    sensor_msgs::PointCloud2 GetEdtMsg();
     // void FilterNormals();
     // void FilterContiguous();
 };
@@ -94,7 +95,8 @@ void CalculatePointCloudEDT(bool *occupied_mat, pcl::PointCloud<pcl::PointXYZI>:
     if (CheckPointInBounds(query, min, max)) {
       int idx = xyz_index3(query, min, size, voxel_size);
       float distance = (float)dt[idx]*voxel_size;
-      if (distance < edt_cloud->points[i].intensity) edt_cloud->points[i].intensity = distance;
+      // if (distance < edt_cloud->points[i].intensity) edt_cloud->points[i].intensity = distance;
+      edt_cloud->points[i].intensity = distance;
     }
   }
 
@@ -144,6 +146,16 @@ sensor_msgs::PointCloud2 NodeManager::GetGroundMsg()
 {
   sensor_msgs::PointCloud2 msg;
   pcl::toROSMsg(*ground_cloud, msg);
+  msg.header.seq = 1;
+  msg.header.stamp = ros::Time();
+  msg.header.frame_id = fixed_frame_id;
+  return msg;
+}
+
+sensor_msgs::PointCloud2 NodeManager::GetEdtMsg()
+{
+  sensor_msgs::PointCloud2 msg;
+  pcl::toROSMsg(*edt_cloud, msg);
   msg.header.seq = 1;
   msg.header.stamp = ros::Time();
   msg.header.frame_id = fixed_frame_id;
@@ -385,6 +397,11 @@ void NodeManager::FindGroundVoxels()
   box_filter.setInputCloud(ground_cloud);
   box_filter.filter(*ground_cloud_local);
 
+  // Extract local bounding box from the edt_cloud
+  pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud_local (new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud_bbx (new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud_bbx_smaller (new pcl::PointCloud<pcl::PointXYZI>);
+
   // Add the biggest (or the one with the robot in it) to the ground_cloud.
   if (cluster_indices.size() > 0) {
     for (int i=0; i<cluster_indices[0].indices.size(); i++) {
@@ -393,6 +410,9 @@ void NodeManager::FindGroundVoxels()
       query[1] = ground_cloud_normal_filtered->points[cluster_indices[0].indices[i]].y;
       query[2] = ground_cloud_normal_filtered->points[cluster_indices[0].indices[i]].z;
       ground_cloud_local->points.push_back(ground_cloud_normal_filtered->points[cluster_indices[0].indices[i]]);
+      pcl::PointXYZI edt_point;
+      edt_point.x = query[0]; edt_point.y = query[1]; edt_point.z = query[2]; edt_point.intensity = 0.0;
+      edt_cloud_bbx->points.push_back(edt_point);
       // Remove all the occupied cells beneath the ground cloud voxels from the occupied_mat
       query[2] = query[2] - voxel_size;
       if (CheckPointInBounds(query, bbx_min_array, bbx_max_array)) {
@@ -412,6 +432,44 @@ void NodeManager::FindGroundVoxels()
   ground_cloud->points.clear();
   for (int i=0; i<ground_cloud_local->points.size(); i++) {
     ground_cloud->points.push_back(ground_cloud_local->points[i]);
+  }
+
+  // Calculate EDT bbx
+  double bbx_min_array_edt[3];
+  double bbx_max_array_edt[3];
+  for (int i=0; i<3; i++) {
+    double bbx_center = (bbx_min_array[i] + bbx_max_array[i])/2.0;
+    bbx_min_array_edt[i] = bbx_center - (bbx_size[i]/4.0)*voxel_size;
+    bbx_max_array_edt[i] = bbx_center + (bbx_size[i]/4.0)*voxel_size;
+  }
+  Eigen::Vector4f bbx_min_edt(bbx_min_array_edt[0], bbx_min_array_edt[1], bbx_min_array_edt[2], 0.0);
+  Eigen::Vector4f bbx_max_edt(bbx_max_array_edt[0], bbx_max_array_edt[1], bbx_max_array_edt[2], 0.0);
+
+  pcl::CropBox<pcl::PointXYZI> box_filter2;
+  box_filter2.setMin(bbx_min_edt);
+  box_filter2.setMax(bbx_max_edt);
+  box_filter2.setNegative(false);
+  box_filter2.setInputCloud(edt_cloud_bbx);
+  box_filter2.filter(*edt_cloud_bbx_smaller);
+
+  // EDT Calculation
+  CalculatePointCloudEDT(occupied_mat, edt_cloud_bbx_smaller, bbx_min_array, bbx_size, voxel_size);
+
+  // Copy to edt_cloud
+  pcl::CropBox<pcl::PointXYZI> box_filter3;
+  box_filter3.setMin(bbx_min_edt);
+  box_filter3.setMax(bbx_max_edt);
+  box_filter3.setNegative(true);
+  box_filter3.setInputCloud(edt_cloud);
+  box_filter3.filter(*edt_cloud_local);
+
+  for (int i=0; i<edt_cloud_bbx_smaller->points.size(); i++) {
+    edt_cloud_local->points.push_back(edt_cloud_bbx_smaller->points[i]);
+  }
+
+  edt_cloud->points.clear();
+  for (int i=0; i<edt_cloud_local->points.size(); i++) {
+    edt_cloud->points.push_back(edt_cloud_local->points[i]);
   }
 }
 
@@ -456,6 +514,6 @@ int main(int argc, char **argv)
     node_manager.FindGroundVoxels();
     ROS_INFO("ground cloud currently has %d points", node_manager.ground_cloud->points.size());
     if (node_manager.ground_cloud->points.size() > 0) pub1.publish(node_manager.GetGroundMsg());
-    // if (node_manager.edt_msg.data.size() > 0) pub2.publish(node_manager.edt_msg);
+    if (node_manager.edt_cloud->points.size() > 0) pub2.publish(node_manager.GetEdtMsg());
   }
 }

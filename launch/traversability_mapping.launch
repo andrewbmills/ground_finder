@@ -7,11 +7,11 @@
 	<remap from="edt" to="edt"/>
 
   	<!-- Params -->
-  	<param name="update_rate" value="5.0"/>
+  	<param name="update_rate" value="2.0"/>
   	<param name="min_cluster_size" value="50"/>
     <!-- 0.95 filters out stairs in the EC Basement -->
   	<param name="normal_z_threshold" value="0.92"/>
-	<param name="sensor_range" value="12.0"/>
+	<param name="sensor_range" value="15.0"/>
 	<!-- <param name="bbx_xy" value="8.0"/> -->
 	<!-- <param name="bbx_z" value ="3.0"/> -->
   </node>

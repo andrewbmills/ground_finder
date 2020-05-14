@@ -60,8 +60,8 @@ class NodeManager
     bool use_tf = false;
     std::string robot_frame_id;
     std::string fixed_frame_id;
-    // sensor_msgs::PointCloud2 ground_msg;
-    // sensor_msgs::PointCloud2 edt_msg;
+    sensor_msgs::PointCloud2 ground_msg;
+    sensor_msgs::PointCloud2 edt_msg;
     octomap::OcTree* map_octree;
     bool map_updated = false;
     bool position_updated = false;
@@ -75,8 +75,8 @@ class NodeManager
     void CallbackOdometry(const nav_msgs::Odometry msg);
     void FindGroundVoxels();
     void UpdateRobotState();
-    sensor_msgs::PointCloud2 GetGroundMsg();
-    sensor_msgs::PointCloud2 GetEdtMsg();
+    void GetGroundMsg();
+    void GetEdtMsg();
     // void FilterNormals();
     // void FilterContiguous();
 };
@@ -106,6 +106,7 @@ void CalculatePointCloudEDT(bool *occupied_mat, pcl::PointCloud<pcl::PointXYZI>:
 
 void NodeManager::CallbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
 {
+  if (msg->data.size() == 0) return;
   delete map_octree;
   map_octree = (octomap::OcTree*)octomap_msgs::binaryMsgToMap(*msg);
   map_updated = true;
@@ -142,24 +143,24 @@ void NodeManager::UpdateRobotState()
   }
 }
 
-sensor_msgs::PointCloud2 NodeManager::GetGroundMsg()
+void NodeManager::GetGroundMsg()
 {
   sensor_msgs::PointCloud2 msg;
   pcl::toROSMsg(*ground_cloud, msg);
   msg.header.seq = 1;
   msg.header.stamp = ros::Time();
   msg.header.frame_id = fixed_frame_id;
-  return msg;
+  ground_msg = msg;
 }
 
-sensor_msgs::PointCloud2 NodeManager::GetEdtMsg()
+void NodeManager::GetEdtMsg()
 {
   sensor_msgs::PointCloud2 msg;
   pcl::toROSMsg(*edt_cloud, msg);
   msg.header.seq = 1;
   msg.header.stamp = ros::Time();
   msg.header.frame_id = fixed_frame_id;
-  return msg;
+  edt_msg = msg;
 }
 
 void NodeManager::FindGroundVoxels()
@@ -184,13 +185,13 @@ void NodeManager::FindGroundVoxels()
 
   ROS_INFO("Calculating bounding box.");
   // ***** //
-  // Find a bounding box around the robot's current position to limit the map queries
+  // Find a bounding box around the robot's current position to limit the map queries and cap compute/memory
   double bbx_min_array[3];
   double bbx_max_array[3];
 
   for (int i=0; i<3; i++) {
-    bbx_min_array[i] = min_tree[i] + std::round((robot.position[i] - robot.sensor_range - min_tree[i])/voxel_size)*voxel_size - 2.95*voxel_size;
-    bbx_max_array[i] = min_tree[i] + std::round((robot.position[i] + robot.sensor_range - min_tree[i])/voxel_size)*voxel_size + 2.95*voxel_size;
+    bbx_min_array[i] = min_tree[i] + std::round((robot.position[i] - 2.0*robot.sensor_range - min_tree[i])/voxel_size)*voxel_size - 2.95*voxel_size;
+    bbx_max_array[i] = min_tree[i] + std::round((robot.position[i] + 2.0*robot.sensor_range - min_tree[i])/voxel_size)*voxel_size + 2.95*voxel_size;
   }
   Eigen::Vector4f bbx_min(bbx_min_array[0], bbx_min_array[1], bbx_min_array[2], 1.0);
   Eigen::Vector4f bbx_max(bbx_max_array[0], bbx_max_array[1], bbx_max_array[2], 1.0);
@@ -471,6 +472,9 @@ void NodeManager::FindGroundVoxels()
   for (int i=0; i<edt_cloud_local->points.size(); i++) {
     edt_cloud->points.push_back(edt_cloud_local->points[i]);
   }
+
+  GetGroundMsg();
+  GetEdtMsg();
 }
 
 int main(int argc, char **argv)
@@ -479,9 +483,6 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "traversability_mapping");
   ros::NodeHandle n;
 
-  // double voxel_size;
-  // n.param("traversability_mapping/voxel_size", voxel_size, 0.2);
-  // NodeManager node_manager(voxel_size);
   NodeManager node_manager;
 
   // Subscribers and Publishers
@@ -513,7 +514,7 @@ int main(int argc, char **argv)
     ros::spinOnce();
     node_manager.FindGroundVoxels();
     ROS_INFO("ground cloud currently has %d points", node_manager.ground_cloud->points.size());
-    if (node_manager.ground_cloud->points.size() > 0) pub1.publish(node_manager.GetGroundMsg());
-    if (node_manager.edt_cloud->points.size() > 0) pub2.publish(node_manager.GetEdtMsg());
+    if (node_manager.ground_cloud->points.size() > 0) pub1.publish(node_manager.ground_msg);
+    if (node_manager.edt_cloud->points.size() > 0) pub2.publish(node_manager.edt_msg);
   }
 }

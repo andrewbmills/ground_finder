@@ -45,7 +45,7 @@ void PointCloudEDT(pcl::PointCloud<pcl::PointXYZ>::Ptr input, pcl::PointCloud<pc
     }
   }
 
-  // If a cell is below an input point, it is ground and shouldn' be occupied.
+  // If a cell is below an input point, it is ground and shouldn't be occupied.
   for (int i=0; i<input->points.size(); i++) {
     for (int j=1; j<3; j++) {
       double query[3] = {(double)input->points[i].x, (double)input->points[i].y, (double)input->points[i].z - j*voxel_size};
@@ -119,8 +119,16 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
     }
     // Check if bottom neighbor or its neighbors are an occupied voxel
     // ROS_INFO("Node is free, checking bottom neighbor.");
-    std::vector<octomap::OcTreeNode*> bottom_neighbors;
     octomap::OcTreeNode* node0 = tree->search(it.getX(), it.getY(), it.getZ() - tree->getResolution());
+    if (node0 == NULL) { // include points that have bottom neighbors that are unseen
+      ground_point.x = it.getX();
+      ground_point.y = it.getY();
+      ground_point.z = it.getZ();
+      cloud->points.push_back(ground_point);
+      continue;
+    }
+
+    std::vector<octomap::OcTreeNode*> bottom_neighbors;
     octomap::OcTreeNode* node1 = tree->search(it.getX() - tree->getResolution(), it.getY(), it.getZ() - tree->getResolution());
     octomap::OcTreeNode* node2 = tree->search(it.getX() + tree->getResolution(), it.getY(), it.getZ() - tree->getResolution());
     octomap::OcTreeNode* node3 = tree->search(it.getX(), it.getY() - tree->getResolution(), it.getZ() - tree->getResolution());
@@ -130,14 +138,6 @@ void GroundFinder::callbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
     bottom_neighbors.push_back(node2);
     bottom_neighbors.push_back(node3);
     bottom_neighbors.push_back(node4);
-
-    if (bottom_neighbors[0] == NULL) { // include points that have bottom neighbors that are unseen
-      ground_point.x = it.getX();
-      ground_point.y = it.getY();
-      ground_point.z = it.getZ();
-      cloud->points.push_back(ground_point);
-      continue;
-    }
 
     int ground_neighbor_count = 0;
     for (int i=0; i<5; i++) {

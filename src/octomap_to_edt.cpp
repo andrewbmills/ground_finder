@@ -57,7 +57,6 @@ class NodeManager
     float normal_curvature_threshold;
     void CallbackOctomap(const octomap_msgs::Octomap::ConstPtr msg);
     void UpdateEDT();
-    void GetEdtMsg();
 };
 
 void CalculatePointCloudEDT(bool *occupied_mat, pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud, double min[3], int size[3], double voxel_size)
@@ -109,6 +108,8 @@ void NodeManager::UpdateEDT()
   max[0] = x_max; max[1] = y_max; max[2] = z_max;
   int size[3];
   for (int i=0; i<3; i++) {
+    min[i] = min[i] - map_octree->getResolution();
+    max[i] = max[i] + map_octree->getResolution();
     size[i] = std::round((max[i] - min[i])/map_octree->getResolution()) + 1;
   }
 

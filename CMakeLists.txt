@@ -41,3 +41,8 @@ add_executable(traversability_mapping src/traversability_map_node.cpp)
 target_link_libraries(traversability_mapping
   ${catkin_LIBRARIES}
 )
+
+add_executable(octomap_to_edt src/octomap_to_edt.cpp)
+target_link_libraries(octomap_to_edt
+  ${catkin_LIBRARIES}
+)

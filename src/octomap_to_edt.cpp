@@ -117,6 +117,7 @@ void NodeManager::UpdateEDT()
   bool occupied_mat[flat_matrix_length];
   for (int i=0; i<flat_matrix_length; i++) occupied_mat[i] = true;
   pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud (new pcl::PointCloud<pcl::PointXYZI>);
+  pcl::PointCloud<pcl::PointXYZI>::Ptr occupied_cloud (new pcl::PointCloud<pcl::PointXYZI>);
 
   map_octree->expand();
   ROS_INFO("Beginning tree iteration");
@@ -127,9 +128,12 @@ void NodeManager::UpdateEDT()
       // Add to occupied_mat
       double query[3];
       query[0] = it.getX(); query[1] = it.getY(); query[2] = it.getZ();
+      pcl::PointXYZI query_point;
+      query_point.x = query[0]; query_point.y = query[1]; query_point.z = query[2]; query_point.intensity = 0.0;
       if (CheckPointInBounds(query, min, max)) {
         int id = xyz_index3(query, min, size, map_octree->getResolution());
         occupied_mat[id] = false;
+        occupied_cloud->points.push_back(query_point);
       }
     }
     else if (it->getOccupancy() <= 0.4)
@@ -147,6 +151,11 @@ void NodeManager::UpdateEDT()
 
   // Run EDT
   CalculatePointCloudEDT(occupied_mat, edt_cloud, min, size, map_octree->getResolution());
+
+  // Add occupied pointcloud to the edt
+  for (int i=0; i<occupied_cloud->points.size(); i++) {
+    edt_cloud->points.push_back(occupied_cloud->points[i]);
+  }
 
   // Copy to msg
   sensor_msgs::PointCloud2 msg;

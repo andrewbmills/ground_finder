@@ -113,10 +113,15 @@ void NodeManager::UpdateEDT()
     size[i] = std::round((max[i] - min[i])/map_octree->getResolution()) + 1;
   }
 
+  ROS_INFO("Got map extent of [%0.2f, %0.2f, %0.2f] to [%0.2f, %0.2f, %0.2f]", min[0], min[1], min[2], max[0], max[1], max[2]);
+  ROS_INFO("Flat matrix dimensions are [%d, %d, %d]", size[0], size[1], size[2]);
+
   // Allocate occupied flat matrix and free space pointcloud
   int flat_matrix_length = size[0]*size[1]*size[2];
-  bool occupied_mat[flat_matrix_length];
+  bool* occupied_mat = new bool[flat_matrix_length];
+  ROS_INFO("Allocated %d bytes for occupied flat matrix", sizeof(occupied_mat));
   for (int i=0; i<flat_matrix_length; i++) occupied_mat[i] = true;
+  ROS_INFO("Initialized all matrix values to unoccupied.");
   pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud (new pcl::PointCloud<pcl::PointXYZI>);
   pcl::PointCloud<pcl::PointXYZI>::Ptr occupied_cloud (new pcl::PointCloud<pcl::PointXYZI>);
 
@@ -150,13 +155,20 @@ void NodeManager::UpdateEDT()
     }
   }
 
+  ROS_INFO("Parsed octomap into a free-space cloud of length %d and an occupied cloud of length %d",
+    edt_cloud->points.size(), occupied_cloud->points.size());
+
   // Run EDT
   CalculatePointCloudEDT(occupied_mat, edt_cloud, min, size, map_octree->getResolution());
+
+  ROS_INFO("EDT Calculated.");
 
   // Add occupied pointcloud to the edt
   for (int i=0; i<occupied_cloud->points.size(); i++) {
     edt_cloud->points.push_back(occupied_cloud->points[i]);
   }
+
+  ROS_INFO("Copied occupied voxel distance values into edt pointcloud");
 
   // Copy to msg
   sensor_msgs::PointCloud2 msg;
@@ -166,6 +178,7 @@ void NodeManager::UpdateEDT()
   msg.header.frame_id = fixed_frame_id;
   edt_msg = msg;
 
+  delete[] occupied_mat;
   return;
 }
 

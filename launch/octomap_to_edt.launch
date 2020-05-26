@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <launch>
-<group ns="X1">
+<group ns="A01">
   <node pkg="ground_finder" type="octomap_to_edt" name="octomap_to_edt" output="screen">
-  	<!-- <remap from="octomap_binary" to="merged_map"/> -->
-	<remap from="octomap_binary" to="octomap_binary"/>
-	<remap from="edt" to="edt"/>
+  	<remap from="octomap_binary" to="merged_map"/>
+		<!-- <remap from="octomap_binary" to="octomap_binary"/> -->
+		<remap from="edt" to="edt"/>
 
   	<!-- Params -->
   	<param name="update_rate" value="1.0"/>

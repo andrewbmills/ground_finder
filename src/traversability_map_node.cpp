@@ -208,7 +208,8 @@ void NodeManager::FindGroundVoxels()
     bbx_size[i] = (int)std::round((bbx_max[i] - bbx_min[i])/voxel_size) + 1;
   }
   int bbx_mat_length = bbx_size[0]*bbx_size[1]*bbx_size[2];
-  bool occupied_mat[bbx_mat_length];
+  // bool occupied_mat[bbx_mat_length];
+  bool* occupied_mat = new bool[bbx_mat_length]; // Allows for more memory allocation
   for (int i=0; i<bbx_mat_length; i++) occupied_mat[i] = true;
 
   ROS_INFO("Removing the voxels within the bounding box from the ground_cloud of length %d", ground_cloud->points.size());
@@ -403,6 +404,7 @@ void NodeManager::FindGroundVoxels()
   pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud_bbx (new pcl::PointCloud<pcl::PointXYZI>);
   pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud_bbx_smaller (new pcl::PointCloud<pcl::PointXYZI>);
 
+  ROS_INFO("Copying biggest cluster.");
   // Add the biggest (or the one with the robot in it) to the ground_cloud.
   if (cluster_indices.size() > 0) {
     for (int i=0; i<cluster_indices[0].indices.size(); i++) {
@@ -454,7 +456,9 @@ void NodeManager::FindGroundVoxels()
   box_filter2.filter(*edt_cloud_bbx_smaller);
 
   // EDT Calculation
+  ROS_INFO("Calculating EDT.");
   CalculatePointCloudEDT(occupied_mat, edt_cloud_bbx_smaller, bbx_min_array, bbx_size, voxel_size);
+  ROS_INFO("EDT calculated.");
 
   // Copy to edt_cloud
   pcl::CropBox<pcl::PointXYZI> box_filter3;
@@ -475,6 +479,9 @@ void NodeManager::FindGroundVoxels()
 
   GetGroundMsg();
   GetEdtMsg();
+  delete[] occupied_mat;
+  ROS_INFO("Publishing edt");
+  return;
 }
 
 int main(int argc, char **argv)

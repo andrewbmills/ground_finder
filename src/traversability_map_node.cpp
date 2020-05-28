@@ -69,11 +69,12 @@ class NodeManager
     RobotState robot;
     float normal_z_threshold;
     float normal_curvature_threshold;
+    float truncation_distance = 100.0; // meters
     pcl::PointCloud<pcl::PointXYZ>::Ptr ground_cloud;
     pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud;
     void CallbackOctomap(const octomap_msgs::Octomap::ConstPtr msg);
     void CallbackOdometry(const nav_msgs::Odometry msg);
-    void FindGroundVoxels();
+    void FindGroundVoxels(std::string map_size);
     void UpdateRobotState();
     void GetGroundMsg();
     void GetEdtMsg();
@@ -81,7 +82,7 @@ class NodeManager
     // void FilterContiguous();
 };
 
-void CalculatePointCloudEDT(bool *occupied_mat, pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud, double min[3], int size[3], double voxel_size)
+void CalculatePointCloudEDT(bool *occupied_mat, pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud, double min[3], int size[3], double voxel_size, float truncation_distance)
 {
   // Call EDT function
   float* dt = edt::edt<bool>(occupied_mat, /*sx=*/size[0], /*sy=*/size[1], /*sz=*/size[2],
@@ -96,7 +97,7 @@ void CalculatePointCloudEDT(bool *occupied_mat, pcl::PointCloud<pcl::PointXYZI>:
       int idx = xyz_index3(query, min, size, voxel_size);
       float distance = (float)dt[idx]*voxel_size;
       // if (distance < edt_cloud->points[i].intensity) edt_cloud->points[i].intensity = distance;
-      edt_cloud->points[i].intensity = distance;
+      edt_cloud->points[i].intensity = std::min(distance, truncation_distance);
     }
   }
 
@@ -163,7 +164,7 @@ void NodeManager::GetEdtMsg()
   edt_msg = msg;
 }
 
-void NodeManager::FindGroundVoxels()
+void NodeManager::FindGroundVoxels(std::string map_size)
 {
   if (map_updated) {
     map_updated = false;
@@ -178,21 +179,37 @@ void NodeManager::FindGroundVoxels()
   // but something weird will happen if it does.
   double voxel_size = map_octree->getResolution();
 
-  // Get map minimum dimensions
+  // Get map minimum and maximum dimensions
   double x_min_tree, y_min_tree, z_min_tree;
   map_octree->getMetricMin(x_min_tree, y_min_tree, z_min_tree);
   double min_tree[3] = {x_min_tree, y_min_tree, z_min_tree};
+  double x_max_tree, y_max_tree, z_max_tree;
+  map_octree->getMetricMax(x_max_tree, y_max_tree, z_max_tree);
+  double max_tree[3] = {x_max_tree, y_max_tree, z_max_tree};
 
-  ROS_INFO("Calculating bounding box.");
+  ROS_INFO("Calculating bounding box. Map size =");
+  std::cout << map_size << std::endl;
   // ***** //
   // Find a bounding box around the robot's current position to limit the map queries and cap compute/memory
   double bbx_min_array[3];
   double bbx_max_array[3];
 
-  for (int i=0; i<3; i++) {
-    bbx_min_array[i] = min_tree[i] + std::round((robot.position[i] - 2.0*robot.sensor_range - min_tree[i])/voxel_size)*voxel_size - 2.95*voxel_size;
-    bbx_max_array[i] = min_tree[i] + std::round((robot.position[i] + 2.0*robot.sensor_range - min_tree[i])/voxel_size)*voxel_size + 2.95*voxel_size;
+  // Check if this iteration requires the full map.
+  if (map_size == "bbx") {
+    for (int i=0; i<3; i++) {
+      bbx_min_array[i] = min_tree[i] + std::round((robot.position[i] - 2.0*robot.sensor_range - min_tree[i])/voxel_size)*voxel_size - 2.95*voxel_size;
+      // bbx_min_array[i] = std::max(bbx_min_array[i], min_tree[i] - 1.5*voxel_size);
+      bbx_max_array[i] = min_tree[i] + std::round((robot.position[i] + 2.0*robot.sensor_range - min_tree[i])/voxel_size)*voxel_size + 2.95*voxel_size;
+      // bbx_max_array[i] = std::min(bbx_max_array[i], max_tree[i] + 1.5*voxel_size);
+    }
   }
+  else {
+    for (int i=0; i<3; i++) {
+      bbx_min_array[i] = min_tree[i] - 1.5*voxel_size;
+      bbx_max_array[i] = max_tree[i] + 1.5*voxel_size;
+    }
+  }
+
   Eigen::Vector4f bbx_min(bbx_min_array[0], bbx_min_array[1], bbx_min_array[2], 1.0);
   Eigen::Vector4f bbx_max(bbx_max_array[0], bbx_max_array[1], bbx_max_array[2], 1.0);
   octomap::point3d bbx_min_octomap(bbx_min_array[0], bbx_min_array[1], bbx_min_array[2]);
@@ -412,10 +429,16 @@ void NodeManager::FindGroundVoxels()
       query[0] = ground_cloud_normal_filtered->points[cluster_indices[0].indices[i]].x;
       query[1] = ground_cloud_normal_filtered->points[cluster_indices[0].indices[i]].y;
       query[2] = ground_cloud_normal_filtered->points[cluster_indices[0].indices[i]].z;
-      ground_cloud_local->points.push_back(ground_cloud_normal_filtered->points[cluster_indices[0].indices[i]]);
+      pcl::PointXYZ ground_point;
+      ground_point.x = query[0]; ground_point.y = query[1]; ground_point.z = query[2]; 
+      ground_cloud_local->points.push_back(ground_point);
+      ground_point.z = ground_point.z + voxel_size; // Padding
+      ground_cloud_local->points.push_back(ground_point); // Padding
       pcl::PointXYZI edt_point;
       edt_point.x = query[0]; edt_point.y = query[1]; edt_point.z = query[2]; edt_point.intensity = 0.0;
       edt_cloud_bbx->points.push_back(edt_point);
+      edt_point.z = edt_point.z + voxel_size; // Padding
+      edt_cloud_bbx->points.push_back(edt_point); // Padding
       // Remove all the occupied cells beneath the ground cloud voxels from the occupied_mat
       query[2] = query[2] - voxel_size;
       if (CheckPointInBounds(query, bbx_min_array, bbx_max_array)) {
@@ -440,10 +463,18 @@ void NodeManager::FindGroundVoxels()
   // Calculate EDT bbx
   double bbx_min_array_edt[3];
   double bbx_max_array_edt[3];
-  for (int i=0; i<3; i++) {
-    double bbx_center = (bbx_min_array[i] + bbx_max_array[i])/2.0;
-    bbx_min_array_edt[i] = bbx_center - (bbx_size[i]/4.0)*voxel_size;
-    bbx_max_array_edt[i] = bbx_center + (bbx_size[i]/4.0)*voxel_size;
+  if (map_size == "bbx") {
+    for (int i=0; i<3; i++) {
+      double bbx_center = (bbx_min_array[i] + bbx_max_array[i])/2.0;
+      bbx_min_array_edt[i] = bbx_center - (bbx_size[i]/4.0)*voxel_size;
+      bbx_max_array_edt[i] = bbx_center + (bbx_size[i]/4.0)*voxel_size;
+    }
+  }
+  else {
+    for (int i=0; i<3; i++) {
+      bbx_min_array_edt[i] = bbx_min_array[i];
+      bbx_max_array_edt[i] = bbx_max_array[i];
+    }
   }
   Eigen::Vector4f bbx_min_edt(bbx_min_array_edt[0], bbx_min_array_edt[1], bbx_min_array_edt[2], 0.0);
   Eigen::Vector4f bbx_max_edt(bbx_max_array_edt[0], bbx_max_array_edt[1], bbx_max_array_edt[2], 0.0);
@@ -457,7 +488,7 @@ void NodeManager::FindGroundVoxels()
 
   // EDT Calculation
   ROS_INFO("Calculating EDT.");
-  CalculatePointCloudEDT(occupied_mat, edt_cloud_bbx_smaller, bbx_min_array, bbx_size, voxel_size);
+  CalculatePointCloudEDT(occupied_mat, edt_cloud_bbx_smaller, bbx_min_array, bbx_size, voxel_size, truncation_distance);
   ROS_INFO("EDT calculated.");
 
   // Copy to edt_cloud
@@ -508,6 +539,9 @@ int main(int argc, char **argv)
   n.param<std::string>("traversability_mapping/fixed_frame_id", node_manager.fixed_frame_id, "world");
   n.param("traversability_mapping/sensor_range", node_manager.robot.sensor_range, 5.0);
   n.param("traversability_mapping/use_tf", node_manager.use_tf, false);
+  n.param("traversability_mapping/truncation_distance", node_manager.truncation_distance, (float)4.0);
+  int full_map_ticks = 200;
+  n.param("traversability_mapping/full_map_ticks", full_map_ticks, 200);
 
   float update_rate;
   n.param("traversability_mapping/update_rate", update_rate, (float)5.0);
@@ -515,13 +549,20 @@ int main(int argc, char **argv)
   ros::Rate r(update_rate); // 5 Hz
   ROS_INFO("Finished reading params.");
   // Main Loop
+  int ticks = 0;
   while (ros::ok())
   {
     r.sleep();
     ros::spinOnce();
-    node_manager.FindGroundVoxels();
+    if ((ticks % full_map_ticks) == 0) {
+      node_manager.FindGroundVoxels("full");
+    }
+    else {
+      node_manager.FindGroundVoxels("bbx");
+    }
     ROS_INFO("ground cloud currently has %d points", node_manager.ground_cloud->points.size());
     if (node_manager.ground_cloud->points.size() > 0) pub1.publish(node_manager.ground_msg);
     if (node_manager.edt_cloud->points.size() > 0) pub2.publish(node_manager.edt_msg);
+    ticks++;
   }
 }

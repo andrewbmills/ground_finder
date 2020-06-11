@@ -70,6 +70,7 @@ class NodeManager
     float normal_z_threshold;
     float normal_curvature_threshold;
     float truncation_distance = 100.0; // meters
+    float inflate_distance = 0.0; // meters
     pcl::PointCloud<pcl::PointXYZ>::Ptr ground_cloud;
     pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud;
     void CallbackOctomap(const octomap_msgs::Octomap::ConstPtr msg);
@@ -102,6 +103,14 @@ void CalculatePointCloudEDT(bool *occupied_mat, pcl::PointCloud<pcl::PointXYZI>:
   }
 
   delete[] dt;
+  return;
+}
+
+void InflateObstacles(pcl::PointCloud<pcl::PointXYZI>::Ptr edt_cloud, float inflate_distance)
+{
+  for (int i=0; i<edt_cloud->points.size(); i++) {
+    edt_cloud->points[i].intensity = edt_cloud->points[i].intensity - inflate_distance;
+  }
   return;
 }
 
@@ -374,13 +383,13 @@ void NodeManager::FindGroundVoxels(std::string map_size)
   pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> normal_filter;
   normal_filter.setInputCloud(ground_cloud_prefilter);
   pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree_normal (new pcl::search::KdTree<pcl::PointXYZ>());
+  kdtree_normal->setInputCloud(ground_cloud_prefilter);
   normal_filter.setSearchMethod(kdtree_normal);
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals (new pcl::PointCloud<pcl::Normal>);
-  normal_filter.setRadiusSearch(3.0*map_octree->getResolution());
+  normal_filter.setRadiusSearch(5.0*map_octree->getResolution());
   normal_filter.setViewPoint(0.0, 0.0, 2.0);
   normal_filter.compute(*cloud_normals);
 
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
   for (int i=0; i<cloud_normals->points.size(); i++) {
     if (std::abs(cloud_normals->points[i].normal_z) >= normal_z_threshold) {
       if (std::abs(cloud_normals->points[i].curvature) <= normal_curvature_threshold) {
@@ -394,13 +403,13 @@ void NodeManager::FindGroundVoxels(std::string map_size)
   // ***** //
   // Filter ground by contiguity (is this necessary?)
   pcl::search::KdTree<pcl::PointXYZ>::Ptr kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
-  kdtree->setInputCloud(cloud_filtered);
+  kdtree->setInputCloud(ground_cloud_normal_filtered);
 
   // Initialize euclidean cluster extraction object
   ROS_INFO("Beginning Frontier Clustering");
   std::vector<pcl::PointIndices> cluster_indices;
   pcl::EuclideanClusterExtraction<pcl::PointXYZ> euclidean_cluster_extractor;
-  euclidean_cluster_extractor.setClusterTolerance(1.5*voxel_size); // Clusters must be made of contiguous sections of ground (within sqrt(2)*voxel_size of each other)
+  euclidean_cluster_extractor.setClusterTolerance(1.8*voxel_size); // Clusters must be made of contiguous sections of ground (within sqrt(2)*voxel_size of each other)
   euclidean_cluster_extractor.setMinClusterSize(min_cluster_size); // Cluster must be at least 15 voxels in size
   euclidean_cluster_extractor.setSearchMethod(kdtree);
   euclidean_cluster_extractor.setInputCloud(ground_cloud_normal_filtered);
@@ -461,6 +470,7 @@ void NodeManager::FindGroundVoxels(std::string map_size)
   }
 
   // Calculate EDT bbx
+  
   double bbx_min_array_edt[3];
   double bbx_max_array_edt[3];
   if (map_size == "bbx") {
@@ -489,6 +499,7 @@ void NodeManager::FindGroundVoxels(std::string map_size)
   // EDT Calculation
   ROS_INFO("Calculating EDT.");
   CalculatePointCloudEDT(occupied_mat, edt_cloud_bbx_smaller, bbx_min_array, bbx_size, voxel_size, truncation_distance);
+  InflateObstacles(edt_cloud_bbx_smaller, inflate_distance);
   ROS_INFO("EDT calculated.");
 
   // Copy to edt_cloud
@@ -507,6 +518,7 @@ void NodeManager::FindGroundVoxels(std::string map_size)
   for (int i=0; i<edt_cloud_local->points.size(); i++) {
     edt_cloud->points.push_back(edt_cloud_local->points[i]);
   }
+  
 
   GetGroundMsg();
   GetEdtMsg();
@@ -540,6 +552,7 @@ int main(int argc, char **argv)
   n.param("traversability_mapping/sensor_range", node_manager.robot.sensor_range, 5.0);
   n.param("traversability_mapping/use_tf", node_manager.use_tf, false);
   n.param("traversability_mapping/truncation_distance", node_manager.truncation_distance, (float)4.0);
+  n.param("traversability_mapping/inflate_distance", node_manager.inflate_distance, (float)0.0);
   int full_map_ticks = 200;
   n.param("traversability_mapping/full_map_ticks", full_map_ticks, 200);
 

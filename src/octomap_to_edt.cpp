@@ -19,6 +19,9 @@
 // Eigen
 #include <Eigen/Core>
 
+octomap::OcTree* map_octree;
+bool map_updated = false;
+
 void index3_xyz(const int index, double point[3], double min[3], int size[3], double voxel_size)
 {
   // x+y*sizx+z*sizx*sizy
@@ -45,17 +48,17 @@ bool CheckPointInBounds(double p[3], double min[3], double max[3])
 class NodeManager
 {
   public:
-    NodeManager()
-    {
-      map_octree = new octomap::OcTree(0.1);
-    }
+    // NodeManager()
+    // {
+    //   map_octree = new octomap::OcTree(0.1);
+    // }
     std::string fixed_frame_id;
     sensor_msgs::PointCloud2 edt_msg;
-    octomap::OcTree* map_octree;
-    bool map_updated = false;
+    // octomap::OcTree* map_octree;
+    // bool map_updated = false;
     float normal_z_threshold;
     float normal_curvature_threshold;
-    void CallbackOctomap(const octomap_msgs::Octomap::ConstPtr msg);
+    // void CallbackOctomap(const octomap_msgs::Octomap::ConstPtr msg);
     void UpdateEDT();
 };
 
@@ -82,7 +85,7 @@ void CalculatePointCloudEDT(bool *occupied_mat, pcl::PointCloud<pcl::PointXYZI>:
   return;
 }
 
-void NodeManager::CallbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
+void CallbackOctomap(const octomap_msgs::Octomap::ConstPtr msg)
 {
   if (msg->data.size() == 0) return;
   delete map_octree;
@@ -191,7 +194,8 @@ int main(int argc, char **argv)
   NodeManager node_manager;
 
   // Subscribers and Publishers
-  ros::Subscriber sub = n.subscribe("octomap_binary", 1, &NodeManager::CallbackOctomap, &node_manager);
+  // ros::Subscriber sub = n.subscribe("octomap_binary", 1, &NodeManager::CallbackOctomap, &node_manager);
+  ros::Subscriber sub = n.subscribe("octomap_binary", 1, CallbackOctomap);
   ros::Publisher pub = n.advertise<sensor_msgs::PointCloud2>("edt", 5);
 
   ROS_INFO("Initialized subscriber and publishers.");

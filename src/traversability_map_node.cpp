@@ -90,7 +90,7 @@ void CalculatePointCloudEDT(bool *occupied_mat, pcl::PointCloud<pcl::PointXYZI>:
 {
   // Call EDT function
   float* dt = edt::edt<bool>(occupied_mat, /*sx=*/size[0], /*sy=*/size[1], /*sz=*/size[2],
-  /*wx=*/1.0, /*wy=*/1.0, /*wz=*/1.0, /*black_border=*/false);
+  /*wx=*/1.0, /*wy=*/1.0, /*wz=*/100.0, /*black_border=*/false);
 
   // Parse EDT result into output PointCloud
   double max[3];
